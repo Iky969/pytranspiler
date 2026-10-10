@@ -45,32 +45,36 @@ class PythonFrontend:
 
     def lower_stmt(self, node: ast.stmt) -> Optional[Dict[str, Any]]:
         if isinstance(node, ast.FunctionDef):
-            return self._lower_function(node)
-        if isinstance(node, ast.Return):
+            result = self._lower_function(node)
+        elif isinstance(node, ast.Return):
             value = self.lower_expr(node.value) if node.value is not None else None
-            return ir.ret(value)
-        if isinstance(node, ast.Assign):
-            return self._lower_assign(node)
-        if isinstance(node, ast.AugAssign):
-            return self._lower_augassign(node)
-        if isinstance(node, ast.AnnAssign):
-            return self._lower_annassign(node)
-        if isinstance(node, ast.If):
-            return ir.if_(
+            result = ir.ret(value)
+        elif isinstance(node, ast.Assign):
+            result = self._lower_assign(node)
+        elif isinstance(node, ast.AugAssign):
+            result = self._lower_augassign(node)
+        elif isinstance(node, ast.AnnAssign):
+            result = self._lower_annassign(node)
+        elif isinstance(node, ast.If):
+            result = ir.if_(
                 self.lower_expr(node.test),
                 [self.lower_stmt(s) for s in node.body if not self._is_docstring(s)],
                 [self.lower_stmt(s) for s in node.orelse if not self._is_docstring(s)],
             )
-        if isinstance(node, ast.While):
-            return ir.while_(
+        elif isinstance(node, ast.While):
+            result = ir.while_(
                 self.lower_expr(node.test),
                 [self.lower_stmt(s) for s in node.body if not self._is_docstring(s)],
             )
-        if isinstance(node, ast.Expr):
-            return self.lower_expr(node.value)
-        if isinstance(node, ast.Pass):
+        elif isinstance(node, ast.Expr):
+            result = self.lower_expr(node.value)
+        elif isinstance(node, ast.Pass):
             return None
-        raise FrontendError(f"unsupported statement: {type(node).__name__} (line {node.lineno})")
+        else:
+            raise FrontendError(f"unsupported statement: {type(node).__name__} (line {node.lineno})")
+        if isinstance(result, dict) and hasattr(node, "lineno"):
+            result["lineno"] = node.lineno
+        return result
 
     def _lower_function(self, node: ast.FunctionDef) -> Dict[str, Any]:
         params = [self._lower_arg(a) for a in node.args.args]
@@ -122,25 +126,31 @@ class PythonFrontend:
                 raise FrontendError(
                     f"unsupported binary operator {type(node.op).__name__} (line {node.lineno})"
                 )
-            return ir.bin_op(op, self.lower_expr(node.left), self.lower_expr(node.right))
-        if isinstance(node, ast.UnaryOp):
+            result = ir.bin_op(op, self.lower_expr(node.left), self.lower_expr(node.right))
+        elif isinstance(node, ast.UnaryOp):
             op = self.unary_ops.get(type(node.op).__name__)
             if op is None:
                 raise FrontendError(
                     f"unsupported unary operator {type(node.op).__name__} (line {node.lineno})"
                 )
-            return ir.unary_op(op, self.lower_expr(node.operand))
-        if isinstance(node, ast.Compare):
-            return self._lower_compare(node)
-        if isinstance(node, ast.Call):
+            result = ir.unary_op(op, self.lower_expr(node.operand))
+        elif isinstance(node, ast.Compare):
+            result = self._lower_compare(node)
+        elif isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name):
                 raise FrontendError(f"unsupported call target (line {node.lineno})")
-            return ir.call(node.func.id, [self.lower_expr(a) for a in node.args])
-        if isinstance(node, ast.Name):
-            return ir.var(node.id)
-        if isinstance(node, ast.Constant):
-            return self._lower_constant(node)
-        raise FrontendError(f"unsupported expression: {type(node).__name__} (line {node.lineno})")
+            result = ir.call(node.func.id, [self.lower_expr(a) for a in node.args])
+        elif isinstance(node, ast.Name):
+            result = ir.var(node.id)
+        elif isinstance(node, ast.Constant):
+            result = self._lower_constant(node)
+        elif isinstance(node, ast.JoinedStr):
+            result = self._lower_joined_str(node)
+        else:
+            raise FrontendError(f"unsupported expression: {type(node).__name__} (line {node.lineno})")
+        if isinstance(result, dict) and hasattr(node, "lineno"):
+            result["lineno"] = node.lineno
+        return result
 
     def _lower_compare(self, node: ast.Compare) -> Dict[str, Any]:
         if len(node.ops) != 1:
@@ -173,6 +183,22 @@ class PythonFrontend:
         if value is None:
             return ir.literal(None, self.literal_types.get("none", "void"))
         raise FrontendError(f"unsupported literal: {value!r}")
+
+    def _lower_joined_str(self, node: ast.JoinedStr) -> Dict[str, Any]:
+        parts = []
+        for val in node.values:
+            if isinstance(val, ast.Constant):
+                parts.append(ir.literal(str(val.value), self.literal_types.get("str", "str")))
+            elif isinstance(val, ast.FormattedValue):
+                parts.append(self.lower_expr(val.value))
+            else:
+                raise FrontendError(f"unsupported formatted value in f-string (line {node.lineno})")
+        if not parts:
+            return ir.literal("", self.literal_types.get("str", "str"))
+        result = parts[0]
+        for part in parts[1:]:
+            result = ir.bin_op("ADD", result, part)
+        return result
 
     # -- helpers ------------------------------------------------------------
 

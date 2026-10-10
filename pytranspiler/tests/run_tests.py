@@ -48,6 +48,9 @@ CASE_TARGETS: Dict[str, List[str]] = {
     "04_floats": ["rust", "ruby", "c"],
     "05_phi_hoisting": ["rust", "ruby", "x86_64", "c"],
     "06_nested_expr": ["rust", "ruby", "x86_64", "c"],
+    "07_functions": ["rust", "ruby", "c"],
+    "08_floordiv_mod": ["rust", "ruby", "c"],
+    "09_strings": ["rust", "ruby"],
 }
 
 # Deterministic sample arguments used when exercising generated functions.
@@ -121,7 +124,10 @@ def collect_calls(transpiler, case_path: str, name: str) -> List[Tuple]:
         ret = fn["return_type"]
         target_fn = getattr(module, fn["name"])
         for sample in SAMPLES.get(len(ptypes), [tuple(range(len(ptypes)))]):
-            args = [float(a) if t == "f64" else int(a) for a, t in zip(sample, ptypes)]
+            args = [
+                str(a) if t == "str" else (float(a) if t == "f64" else int(a))
+                for a, t in zip(sample, ptypes)
+            ]
             calls.append((fn["name"], ptypes, ret, args, target_fn(*args)))
     return calls
 
@@ -245,11 +251,15 @@ def test_negative(results: Results) -> None:
     print("\n[negative cases]")
     transpiler = pytranspiler.Transpiler()
 
-    def expect_error(name: str, source: str, exc_types, target: str = "rust") -> None:
+    def expect_error(name: str, source: str, exc_types, target: str = "rust", check_line: bool = True) -> None:
         try:
             transpiler.transpile(source, target, "<test>")
         except exc_types as exc:
-            results.check(name, True, str(exc))
+            msg = str(exc)
+            if check_line and "line" not in msg:
+                results.check(name, False, f"expected line number in error, got: {msg}")
+                return
+            results.check(name, True, msg)
             return
         except Exception as exc:  # noqa: BLE001
             results.check(name, False, f"unexpected {type(exc).__name__}: {exc}")

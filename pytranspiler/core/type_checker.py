@@ -8,7 +8,7 @@ literal is typed ``i64`` and the assignment inherits it.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import ir
 from .ir import NUMERIC_ORDER
@@ -27,11 +27,21 @@ class TypeChecker:
     def __init__(self, frontend_rules: Optional[Dict[str, Any]] = None):
         rules = frontend_rules or {}
         self.builtin_returns: Dict[str, str] = rules.get("builtin_return_types", {})
+        self.functions: Dict[str, Dict[str, Any]] = {}
 
     # -- entry point --------------------------------------------------------
 
     def check(self, module_ir: Dict[str, Any]) -> Dict[str, Any]:
         ir.validate(module_ir)
+        # First pass: collect all function signatures so calls between
+        # user-defined functions (including recursion) can be validated.
+        for fn in module_ir["body"]:
+            if fn.get("node") == ir.FUNCTION_DEF:
+                self.functions[fn["name"]] = {
+                    "params": [{"name": p["name"], "type": p.get("type")} for p in fn["params"]],
+                    "return_type": fn.get("return_type"),
+                }
+        # Second pass: type-check each function body.
         for fn in module_ir["body"]:
             if fn.get("node") == ir.FUNCTION_DEF:
                 self._check_function(fn)
@@ -70,18 +80,24 @@ class TypeChecker:
         elif inferred not in (None, "void") and not self._assignable(annotated, inferred):
             raise TypeCheckError(
                 f"function '{fn['name']}': annotated return type '{annotated}' "
-                f"conflicts with inferred '{inferred}'"
+                f"conflicts with inferred '{inferred}'{self._loc(fn)}"
             )
         elif inferred == "void" and annotated != "void":
             # A function that returns nothing but claims a type is an error.
             raise TypeCheckError(
-                f"function '{fn['name']}': annotated '{annotated}' but no value is returned"
+                f"function '{fn['name']}': annotated '{annotated}' but no value is returned{self._loc(fn)}"
             )
 
         # Any parameter that is still untyped defaults to i64.
         for p in fn["params"]:
             if p["type"] is None:
                 p["type"] = "i64"
+
+        if fn["name"] in self.functions:
+            self.functions[fn["name"]]["return_type"] = fn["return_type"]
+            self.functions[fn["name"]]["params"] = [
+                {"name": p["name"], "type": p["type"]} for p in fn["params"]
+            ]
 
     @classmethod
     def _collect_locals(
@@ -99,7 +115,7 @@ class TypeChecker:
         (the Python scoping rule) instead of dying at the end of the block.
         """
         order: List[str] = []
-        assigned: Dict[str, List[str]] = {}
+        assigned: Dict[str, List[Tuple[str, Optional[int]]]] = {}
 
         def visit(stmts: List[Dict[str, Any]]) -> None:
             for stmt in stmts:
@@ -112,7 +128,7 @@ class TypeChecker:
                         order.append(name)
                         assigned[name] = []
                     if stmt.get("type"):
-                        assigned[name].append(stmt["type"])
+                        assigned[name].append((stmt["type"], stmt.get("lineno")))
                 elif kind == ir.IF:
                     visit(stmt["body"])
                     visit(stmt["orelse"])
@@ -133,21 +149,22 @@ class TypeChecker:
         return locals_
 
     @staticmethod
-    def _unify_local(name: str, types: List[str]) -> str:
+    def _unify_local(name: str, assignments: List[Tuple[str, Optional[int]]]) -> str:
         """Unify the types of every assignment to one local variable."""
-        concrete = [t for t in types if t]
+        concrete = [a for a in assignments if a[0]]
         if not concrete:
             return "i64"
-        result = concrete[0]
-        for other in concrete[1:]:
+        result, res_line = concrete[0]
+        for other, other_line in concrete[1:]:
             if other == result:
                 continue
             if other in NUMERIC_ORDER and result in NUMERIC_ORDER:
                 result = _wider(result, other)
             else:
+                loc = f" (line {other_line})" if other_line else ""
                 raise TypeCheckError(
                     f"variable '{name}' is assigned conflicting types "
-                    f"'{result}' and '{other}'"
+                    f"'{result}' and '{other}'{loc}"
                 )
         return result
 
@@ -162,6 +179,11 @@ class TypeChecker:
                 TypeChecker._count_assigns(stmt["orelse"], counts)
             elif kind == ir.WHILE:
                 TypeChecker._count_assigns(stmt["body"], counts)
+
+    @staticmethod
+    def _loc(node: Dict[str, Any]) -> str:
+        lineno = node.get("lineno")
+        return f" (line {lineno})" if lineno is not None else ""
 
     def _check_block(
         self,
@@ -192,7 +214,7 @@ class TypeChecker:
             if annotated is not None and not self._assignable(annotated, value_type):
                 raise TypeCheckError(
                     f"assignment to '{stmt['target']}': annotated '{annotated}' "
-                    f"is incompatible with inferred '{value_type}'"
+                    f"is incompatible with inferred '{value_type}'{self._loc(stmt)}"
                 )
             name = stmt["target"]
             stmt["decl"] = name not in env
@@ -207,7 +229,7 @@ class TypeChecker:
             self._require_bool(stmt["test"], env, "while condition")
             self._check_block(stmt["body"], env, return_types, counts)
         elif kind == ir.FUNCTION_DEF:
-            raise TypeCheckError("nested function definitions are not supported")
+            raise TypeCheckError(f"nested function definitions are not supported{self._loc(stmt)}")
         else:
             # Bare expression statement (e.g. print(...)).
             self._infer(stmt, env)
@@ -224,14 +246,17 @@ class TypeChecker:
 
         if kind == ir.VAR:
             if node["name"] not in env:
-                raise TypeCheckError(f"use of undefined variable '{node['name']}'")
+                raise TypeCheckError(f"use of undefined variable '{node['name']}'{self._loc(node)}")
             node["type"] = env[node["name"]] or node.get("type")
             return node["type"]
 
         if kind == ir.BIN_OP:
             lt = self._infer(node["left"], env)
             rt = self._infer(node["right"], env)
-            result = self._binop_type(node["op"], lt, rt)
+            try:
+                result = self._binop_type(node["op"], lt, rt)
+            except TypeCheckError as exc:
+                raise TypeCheckError(f"{exc}{self._loc(node)}") from None
             node["type"] = result
             return result
 
@@ -244,26 +269,44 @@ class TypeChecker:
             lt = self._infer(node["left"], env)
             rt = self._infer(node["right"], env)
             if lt and rt and lt != rt and not self._both_numeric(lt, rt):
-                raise TypeCheckError(f"cannot compare '{lt}' with '{rt}'")
+                raise TypeCheckError(f"cannot compare '{lt}' with '{rt}'{self._loc(node)}")
             node["type"] = "bool"
             return "bool"
 
         if kind == ir.CALL:
-            for i, arg in enumerate(node["args"]):
-                self._infer(arg, env)
-            if node["func"] not in self.builtin_returns:
-                raise TypeCheckError(f"call to unknown function '{node['func']}'")
-            node["type"] = self.builtin_returns[node["func"]]
-            return node["type"]
+            arg_types = []
+            for arg in node["args"]:
+                arg_types.append(self._infer(arg, env))
+            func_name = node["func"]
+            if func_name in self.builtin_returns:
+                node["type"] = self.builtin_returns[func_name]
+                return node["type"]
+            if func_name in self.functions:
+                fn_sig = self.functions[func_name]
+                params = fn_sig.get("params", [])
+                if len(node["args"]) != len(params):
+                    raise TypeCheckError(
+                        f"function '{func_name}' expects {len(params)} argument(s), got {len(node['args'])}{self._loc(node)}"
+                    )
+                for i, (arg_t, param) in enumerate(zip(arg_types, params)):
+                    param_t = param.get("type")
+                    if param_t is not None and not self._assignable(param_t, arg_t):
+                        raise TypeCheckError(
+                            f"argument {i + 1} of '{func_name}': expected '{param_t}', got '{arg_t}'{self._loc(node)}"
+                        )
+                ret_t = fn_sig.get("return_type") or "void"
+                node["type"] = ret_t
+                return node["type"]
+            raise TypeCheckError(f"call to unknown function '{func_name}'{self._loc(node)}")
 
-        raise TypeCheckError(f"cannot infer type of node {kind!r}")
+        raise TypeCheckError(f"cannot infer type of node {kind!r}{self._loc(node)}")
 
     def _require_bool(
         self, node: Dict[str, Any], env: Dict[str, Optional[str]], what: str
     ) -> None:
         t = self._infer(node, env)
         if t not in (None, "bool", "i64"):
-            raise TypeCheckError(f"{what} must be boolean, got '{t}'")
+            raise TypeCheckError(f"{what} must be boolean, got '{t}'{self._loc(node)}")
 
     # -- type rules ---------------------------------------------------------
 

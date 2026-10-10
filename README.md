@@ -1,5 +1,9 @@
 # pytranspiler
 
+[![CI](https://github.com/Rzy/pytranspiler/actions/workflows/ci.yml/badge.svg)](https://github.com/Rzy/pytranspiler/actions/workflows/ci.yml)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+
 A modular, **rule-driven** transpiler that lowers a subset of Python into
 Rust, Ruby, C and x86_64 assembly.
 
@@ -66,22 +70,23 @@ pytranspiler/
     └── cases/                 # compilation test programs (+ expected/ snapshots)
 ```
 
-## Usage
+## Installation & Usage
 
 ```bash
-cd pytranspiler
+# install locally in editable mode
+pip install -e .
 
 # list targets / validate the rule files
-python3 pytranspiler.py --list-targets
-python3 pytranspiler.py --check-rules
+pytranspiler --list-targets
+pytranspiler --check-rules
 
-# transpile (writes <input>.rs next to the current directory)
-python3 pytranspiler.py tests/cases/01_arithmetic.py -t rust
-python3 pytranspiler.py tests/cases/03_control_flow.py -t x86_64 -o control.asm
-python3 pytranspiler.py tests/cases/02_variables.py -t c -o -
+# transpile (writes <input>.<ext> by default or use -o)
+pytranspiler examples/fibonacci.py -t rust
+pytranspiler examples/collatz.py -t x86_64 -o collatz.asm
+pytranspiler examples/gcd.py -t c -o -
 
 # inspect the Canonical IR
-python3 pytranspiler.py tests/cases/01_arithmetic.py --dump-ir
+pytranspiler examples/power.py --dump-ir
 ```
 
 Rust/Ruby/C support: arithmetic, variables, `if/elif/else`, `while`, comparisons,
@@ -227,11 +232,33 @@ programs are therefore assumed to stay within `INT64_MIN..INT64_MAX`:
   **debug** builds panic on overflow;
 * Python's big-integer results are not representable and are not emulated.
 
+## Examples
+
+The `examples/` directory contains realistic programs that demonstrate the
+transpiler's capabilities:
+
+```bash
+# Fibonacci sequence (iterative)
+pytranspiler examples/fibonacci.py -t rust
+pytranspiler examples/fibonacci.py -t c -o fibonacci.c
+
+# Greatest common divisor
+pytranspiler examples/gcd.py -t ruby
+
+# Collatz conjecture steps
+pytranspiler examples/collatz.py -t x86_64 -o collatz.asm
+
+# Integer exponentiation
+pytranspiler examples/power.py -t c -o -
+```
+
 ## Limitations
 
-* Supported source subset: module-level functions, `int`/`float`/`bool`
-  expressions, `+ - * / // %`, comparisons, `and`/`or`, `not`, unary `-`,
-  assignments, `if/elif/else`, `while`, `return` and `print(...)`.
+* Supported source subset: module-level functions, user-defined function calls
+  (including recursion), `int`/`float`/`bool`/`str` expressions (with string concatenation
+  and f-strings), `+ - * / // %` (Python-compliant floor division and modulo semantics
+  on Rust/Ruby/C), comparisons, `and`/`or`, `not`, unary `-`, assignments,
+  `if/elif/else`, `while`, `return` and `print(...)`.
 * The x86_64 backend is integer-only (no floats, strings or calls) and follows
   the System V ABI with at most six register arguments.
 * Values are 64-bit two's complement (see §4 above), not Python big integers.

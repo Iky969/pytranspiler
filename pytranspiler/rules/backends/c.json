@@ -28,6 +28,8 @@
     "While": "{indent}while ({test}) {\n{body}\n{indent}}",
     "Call": "{func}({args})",
     "BinOp": "({left} {op} {right})",
+    "BinOp_FLOORDIV": "((({left}) / ({right})) - ((({left}) % ({right}) != 0 && (({left}) ^ ({right})) < 0) ? 1 : 0))",
+    "BinOp_MOD": "((({left}) % ({right})) + (({right}) * (((({left}) % ({right}) != 0 && (({left}) ^ ({right})) < 0) ? 1 : 0))))",
     "UnaryOp": "({op}{operand})",
     "Compare": "({left} {op} {right})",
     "Var": "{name}",

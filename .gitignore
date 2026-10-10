@@ -3,3 +3,8 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+feedback.txt
+.env
+.env.*
+.env*.local
+.ruko/

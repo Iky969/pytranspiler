@@ -62,7 +62,12 @@ class Emitter:
     def emit(self, node: Dict[str, Any], indent: int) -> str:
         kind = node["node"]
         if kind == ir.BIN_OP:
-            template = self.templates.get("BinOp_" + node["op"]) or self.templates.get(ir.BIN_OP)
+            type_suffix = f"_{node.get('type')}" if node.get("type") else ""
+            template = (
+                self.templates.get("BinOp_" + node["op"] + type_suffix)
+                or self.templates.get("BinOp_" + node["op"])
+                or self.templates.get(ir.BIN_OP)
+            )
         elif kind == ir.CALL:
             template = self.builtins.get(node["func"]) or self.templates.get(ir.CALL)
         elif kind == ir.ASSIGN and not self._declares_local(node):
@@ -70,7 +75,8 @@ class Emitter:
         else:
             template = self.templates.get(kind)
         if template is None:
-            raise EmitterError(f"target '{self.backend.get('target')}' has no template for {kind}")
+            loc = f" (line {node.get('lineno')})" if node.get("lineno") else ""
+            raise EmitterError(f"target '{self.backend.get('target')}' has no template for {kind}{loc}")
         return self._render(template, node, indent)
 
     # -- template engine ----------------------------------------------------
@@ -287,10 +293,12 @@ class AsmEmitter(Emitter):
         if kind == ir.WHILE:
             return self._emit_while(stmt)
         if kind == ir.CALL:
+            loc = f" (line {stmt.get('lineno')})" if stmt.get("lineno") else ""
             raise EmitterError(
-                f"the x86_64 backend does not support calls (got '{stmt.get('func')}')"
+                f"the x86_64 backend does not support calls (got '{stmt.get('func')}'){loc}"
             )
-        raise EmitterError(f"the x86_64 backend does not support statement {kind}")
+        loc = f" (line {stmt.get('lineno')})" if stmt.get("lineno") else ""
+        raise EmitterError(f"the x86_64 backend does not support statement {kind}{loc}")
 
     def _emit_if(self, stmt: Dict[str, Any]) -> str:
         label = self._new_label("if")
@@ -336,7 +344,7 @@ class AsmEmitter(Emitter):
     def _emit_expr(self, node: Dict[str, Any]) -> List[str]:
         kind = node["node"]
         if kind == ir.LITERAL:
-            return self._lit_lines(node["value"])
+            return self._lit_lines(node["value"], node)
         if kind == ir.VAR:
             return [f"    mov {self.acc}, {self._mem(self._slot(node['name']), node.get('type'))}"]
         if kind == ir.BIN_OP:
@@ -346,10 +354,12 @@ class AsmEmitter(Emitter):
         if kind == ir.COMPARE:
             return self._emit_compare(node)
         if kind == ir.CALL:
+            loc = f" (line {node.get('lineno')})" if node.get("lineno") else ""
             raise EmitterError(
-                f"the x86_64 backend does not support calls (got '{node.get('func')}')"
+                f"the x86_64 backend does not support calls (got '{node.get('func')}'){loc}"
             )
-        raise EmitterError(f"the x86_64 backend does not support expression {kind}")
+        loc = f" (line {node.get('lineno')})" if node.get("lineno") else ""
+        raise EmitterError(f"the x86_64 backend does not support expression {kind}{loc}")
 
     def _emit_binop(self, node: Dict[str, Any]) -> List[str]:
         op = node["op"]
@@ -403,11 +413,12 @@ class AsmEmitter(Emitter):
         lines.append(f"    movzx {self.acc}, al")
         return lines
 
-    def _lit_lines(self, value: Any) -> List[str]:
+    def _lit_lines(self, value: Any, node: Optional[Dict[str, Any]] = None) -> List[str]:
         if isinstance(value, bool):
             value = 1 if value else 0
         if isinstance(value, float):
-            raise EmitterError("the x86_64 backend only supports integer literals")
+            loc = f" (line {node.get('lineno')})" if node and node.get("lineno") else ""
+            raise EmitterError(f"the x86_64 backend only supports integer literals{loc}")
         return [f"    mov {self.acc}, {value}"]
 
     # -- helpers ------------------------------------------------------------
