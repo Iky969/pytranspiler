@@ -168,8 +168,9 @@ def build_c_driver(calls: List[Tuple]) -> str:
 
 
 def run_native(label: str, calls: List[Tuple], generated: str, is_asm: bool, results: Results) -> None:
-    if shutil.which("gcc") is None:
-        results.skip(label, "gcc not available")
+    cc = shutil.which("tcc") or shutil.which("gcc")
+    if cc is None:
+        results.skip(label, "no C compiler (tcc/gcc) available")
         return
     with tempfile.TemporaryDirectory() as tmp:
         module_path = os.path.join(tmp, "module.s" if is_asm else "module.c")
@@ -182,7 +183,7 @@ def run_native(label: str, calls: List[Tuple], generated: str, is_asm: bool, res
         exe_path = os.path.join(tmp, "prog")
         try:
             subprocess.run(
-                ["gcc", driver_path, module_path, "-o", exe_path],
+                [cc, driver_path, module_path, "-o", exe_path],
                 check=True, capture_output=True, text=True,
             )
         except (subprocess.CalledProcessError, OSError) as exc:
