@@ -46,6 +46,8 @@ CASE_TARGETS: Dict[str, List[str]] = {
     "02_variables": ["rust", "ruby", "x86_64", "c"],
     "03_control_flow": ["rust", "ruby", "x86_64", "c"],
     "04_floats": ["rust", "ruby", "c"],
+    "05_phi_hoisting": ["rust", "ruby", "x86_64", "c"],
+    "06_nested_expr": ["rust", "ruby", "x86_64", "c"],
 }
 
 # Deterministic sample arguments used when exercising generated functions.
@@ -54,6 +56,7 @@ SAMPLES: Dict[int, List[Tuple[int, ...]]] = {
     1: [(7,), (0,), (-4,)],
     2: [(3, 9), (9, 3), (4, 4)],
     3: [(1, 2, 3), (10, 4, 6)],
+    6: [(2, 3, 4, 5, 6, 7), (1, 1, 1, 1, 1, 1)],
 }
 
 C_TYPE = {"i64": "long", "f64": "double", "bool": "int", "void": "void", "str": "char *"}
@@ -265,6 +268,9 @@ def test_negative(results: Results) -> None:
                  emitter_mod.EmitterError, target="x86_64")
     expect_error("annotated return conflict",
                  "def f() -> int:\n    return 1 + 2.5\n",
+                 type_checker.TypeCheckError)
+    expect_error("conflicting types for one local",
+                 'def f():\n    x = 1\n    x = "a"\n    return x\n',
                  type_checker.TypeCheckError)
 
 

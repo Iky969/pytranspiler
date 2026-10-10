@@ -55,6 +55,13 @@ class TypeChecker:
         return_types: List[str] = []
         self._check_block(fn["body"], env, return_types, counts)
 
+        # Variable hoisting: annotate the function with every local binding so
+        # block-scoped backends (Rust, C) can declare them in the prologue
+        # instead of at their -- possibly nested -- first assignment.
+        fn["locals"] = self._collect_locals(
+            fn["body"], {p["name"] for p in fn["params"]}, counts
+        )
+
         # Resolve return type.
         inferred = self._unify_returns(return_types)
         annotated = fn.get("return_type")
@@ -75,6 +82,74 @@ class TypeChecker:
         for p in fn["params"]:
             if p["type"] is None:
                 p["type"] = "i64"
+
+    @classmethod
+    def _collect_locals(
+        cls,
+        body: List[Dict[str, Any]],
+        param_names: set,
+        counts: Dict[str, int],
+    ) -> List[Dict[str, Any]]:
+        """Collect the function's local (non-parameter) bindings.
+
+        Returns them in first-appearance order with a unified type and a
+        ``mutable`` flag.  This is the *hoisting* pass: it lets a backend
+        declare every local in the prologue, so a variable first assigned
+        inside an ``if``/``while`` block keeps a single function-wide binding
+        (the Python scoping rule) instead of dying at the end of the block.
+        """
+        order: List[str] = []
+        assigned: Dict[str, List[str]] = {}
+
+        def visit(stmts: List[Dict[str, Any]]) -> None:
+            for stmt in stmts:
+                kind = stmt.get("node")
+                if kind == ir.ASSIGN:
+                    name = stmt["target"]
+                    if name in param_names:
+                        continue
+                    if name not in order:
+                        order.append(name)
+                        assigned[name] = []
+                    if stmt.get("type"):
+                        assigned[name].append(stmt["type"])
+                elif kind == ir.IF:
+                    visit(stmt["body"])
+                    visit(stmt["orelse"])
+                elif kind == ir.WHILE:
+                    visit(stmt["body"])
+
+        visit(body)
+
+        locals_: List[Dict[str, Any]] = []
+        for name in order:
+            locals_.append(
+                {
+                    "name": name,
+                    "type": cls._unify_local(name, assigned[name]),
+                    "mutable": counts.get(name, 0) >= 2,
+                }
+            )
+        return locals_
+
+    @staticmethod
+    def _unify_local(name: str, types: List[str]) -> str:
+        """Unify the types of every assignment to one local variable."""
+        concrete = [t for t in types if t]
+        if not concrete:
+            return "i64"
+        result = concrete[0]
+        for other in concrete[1:]:
+            if other == result:
+                continue
+            if other in NUMERIC_ORDER and result in NUMERIC_ORDER:
+                result = _wider(result, other)
+            else:
+                raise TypeCheckError(
+                    f"variable '{name}' is assigned conflicting types "
+                    f"'{result}' and '{other}'"
+                )
+        return result
 
     @staticmethod
     def _count_assigns(body: List[Dict[str, Any]], counts: Dict[str, int]) -> None:

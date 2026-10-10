@@ -43,6 +43,10 @@ class Emitter:
         self.indent_unit: str = backend.get("indent_unit", "    ")
         self.header: str = backend.get("header", "")
         self.footer: str = backend.get("footer", "")
+        # When true the backend declares every local in the function prologue
+        # (via the ``Local`` template), so block-scoped targets (Rust, C) keep
+        # Python's function-wide scoping for branches and loops.
+        self.hoist_locals: bool = backend.get("hoist_locals", False)
 
     # -- public API ---------------------------------------------------------
 
@@ -61,7 +65,7 @@ class Emitter:
             template = self.templates.get("BinOp_" + node["op"]) or self.templates.get(ir.BIN_OP)
         elif kind == ir.CALL:
             template = self.builtins.get(node["func"]) or self.templates.get(ir.CALL)
-        elif kind == ir.ASSIGN and not node.get("decl", True):
+        elif kind == ir.ASSIGN and not self._declares_local(node):
             template = self.templates.get("Reassign") or self.templates.get(ir.ASSIGN)
         else:
             template = self.templates.get(kind)
@@ -80,6 +84,8 @@ class Emitter:
             return self.indent_unit * indent
         if key == "body":
             return self._render_body(node.get("body", []), indent + 1)
+        if key == "locals":
+            return self._render_locals(node, indent + 1)
         if key == "orelse":
             return self._render_orelse(node, indent)
         if key == "params":
@@ -112,6 +118,27 @@ class Emitter:
 
     def _render_body(self, body: List[Dict[str, Any]], indent: int) -> str:
         return "\n".join(self.emit_statement(stmt, indent) for stmt in body)
+
+    def _declares_local(self, node: Dict[str, Any]) -> bool:
+        """Whether an assignment introduces a *new* binding inline.
+
+        Backends that hoist locals never declare inline, so every assignment
+        to a local becomes a plain reassignment and the declaration lives in
+        the prologue.
+        """
+        if self.hoist_locals:
+            return False
+        return bool(node.get("decl", True))
+
+    def _render_locals(self, fn: Dict[str, Any], indent: int) -> str:
+        """Render the hoisted prologue declarations for a function."""
+        if not self.hoist_locals:
+            return ""
+        template = self.templates.get("Local")
+        if template is None:
+            return ""
+        lines = [self._render(template, local, indent) for local in fn.get("locals", [])]
+        return ("\n".join(lines) + "\n") if lines else ""
 
     def emit_statement(self, stmt: Dict[str, Any], indent: int) -> str:
         """Emit a statement, adding block indentation and a terminator to

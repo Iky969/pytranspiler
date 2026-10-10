@@ -3,6 +3,7 @@
   "target": "c",
   "description": "C backend: literal code generation. Demonstrates Phase 5 extensibility.",
   "mode": "literal",
+  "hoist_locals": true,
   "indent_unit": "    ",
   "statement_suffix": ";",
   "extension": ".c",
@@ -15,8 +16,9 @@
     "void": "void"
   },
   "templates": {
-    "FunctionDef": "{indent}{return_type} {name}({params}) {\n{body}\n{indent}}",
+    "FunctionDef": "{indent}{return_type} {name}({params}) {\n{locals}{body}\n{indent}}",
     "Param": "{type} {name}",
+    "Local": "{indent}{type} {name};",
     "Return": "{indent}return {value};",
     "Assign": "{indent}{type} {target} = {value};",
     "Reassign": "{indent}{target} = {value};",

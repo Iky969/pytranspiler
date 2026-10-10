@@ -17,8 +17,10 @@ pub fn sign(x: i64) -> i64 {
 }
 
 pub fn sum_to(n: i64) -> i64 {
-    let mut total = 0;
-    let mut i = n;
+    let mut total: i64;
+    let mut i: i64;
+    total = 0;
+    i = n;
     while (i > 0) {
         total = (total + i);
         i = (i - 1);

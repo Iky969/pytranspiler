@@ -28,6 +28,16 @@ The design follows the specification in [`Jobs.md`](./Jobs.md):
 Every language/target is described by a **JSON rule file**, so adding a new
 target means adding a file under `rules/backends/` — no Python changes.
 
+## Documentation
+
+* [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — repository layout, pipeline
+  stages, the Canonical IR and its passes, rule-file formats, and how the two
+  emitter strategies work.
+* [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) — ground rules, how to run and
+  verify, step-by-step recipes for adding a target / IR node / test case, and a
+  prioritised roadmap (semantics gaps, x86_64 depth, language coverage,
+  extensibility, packaging & CI, performance).
+
 ## Directory structure
 
 ```
@@ -111,8 +121,9 @@ becomes
 ```
 
 `core/ir.py` validates this structure; `core/type_checker.py` fills in any
-missing `type` attributes (so `x = 10` is inferred as `i64`) and rejects
-ill-typed programs.
+missing `type` attributes (so `x = 10` is inferred as `i64`), rejects
+ill-typed programs, and hoists every local binding onto the enclosing function
+(see [Design hardening §1](#1-variable-scoping-and-the-phi-node-case)).
 
 ## Adding a new target
 
@@ -127,7 +138,7 @@ ill-typed programs.
 |---|---|---|
 | 1 | Scalar pipeline — `pytranspiler.py`, `ir.py`, `emitter.py`, `rust.json`, `ruby.json` | ✅ |
 | 2 | x86_64 assembly backend + simple register/frame allocation | ✅ |
-| 3 | Type inference & variables (`Assign`, `Var`, no manual annotations) | ✅ |
+| 3 | Type inference & variables (`Assign`, `Var`, no manual annotations) | ✅ (plus a variable-hoisting pass) |
 | 4 | Control flow (`If`, `While`, `Compare`, unique labels) | ✅ |
 | 5 | Modular extensibility + JSON-Schema validation of `rules/` | ✅ (adds a C target with no Python changes) |
 
@@ -147,6 +158,75 @@ The harness verifies:
 * negative cases (undefined variables, type errors, unsupported syntax),
 * JSON-Schema validation of the rule files, and the IR contract.
 
+## Design hardening
+
+Four failure modes were analysed and are handled as follows.
+
+### 1. Variable scoping and the "phi-node" case
+
+Python scopes a variable to the whole function, so
+
+```python
+if flag > 0:
+    x = 10
+else:
+    x = 20
+return x
+```
+
+must survive lowering to targets with **block scope**.  Emitting `let x = 10;`
+inside the branch would kill `x` at the closing brace (Rust) or hide it from the
+enclosing block (C), so the naive output does not compile.
+
+`core/type_checker.py` therefore runs a **variable-hoisting pass**: before
+emission it collects every non-parameter local in first-appearance order,
+unifies the types of all of its assignments (widening numerics, rejecting
+genuine conflicts) and records them on the function as `locals`.  Backends that
+set `"hoist_locals": true` (Rust, C) declare every local once in the prologue
+via the `Local` template and treat *all* assignments as plain reassignments:
+
+```rust
+pub fn choose(flag: i64) -> i64 {
+    let mut x: i64;
+    if (flag > 0) { x = 10; } else { x = 20; }
+    return x;
+}
+```
+
+The x86_64 backend already reserved one fixed `[rbp-N]` slot per local, so a
+variable assigned in either branch lands in the same slot; Ruby variables are
+function-scoped to begin with, so neither needs the prologue.
+
+### 2. Compound expressions and register pressure
+
+The x86_64 backend does **not** attempt graph-colouring allocation.  It uses
+**stack-based evaluation**: the left operand is `push`ed to the machine stack,
+the right operand is evaluated into the accumulator, and the operation pops the
+left operand back.  Register pressure is constant (one accumulator plus one
+scratch register) regardless of nesting depth, so
+`(a + b) * (c - d) + (e * f)` lowers correctly with only one spill slot live at
+a time.
+
+### 3. System V 16-byte stack alignment
+
+At function entry `call` has pushed an 8-byte return address (`rsp % 16 == 8`);
+after `push rbp` the stack is 16-byte aligned.  Frame allocation rounds the
+reserved size up to the next multiple of `stack_alignment`
+(`core/emitter.py: AsmEmitter._align_frame`), so `sub rsp, N` always keeps `rsp`
+16-byte aligned — the prerequisite for calling into libc/SSE code later.  The
+harness asserts every emitted frame is a multiple of 16.
+
+### 4. Integer overflow semantics
+
+Python integers are arbitrary precision; the backends emit **64-bit two's
+complement** (`i64` in Rust, `long` in C, `rax`/`[rbp-N]` in assembly).  Input
+programs are therefore assumed to stay within `INT64_MIN..INT64_MAX`:
+
+* in-range arithmetic is bit-identical to Python;
+* out-of-range arithmetic **wraps** in C and in Rust release builds, while Rust
+  **debug** builds panic on overflow;
+* Python's big-integer results are not representable and are not emulated.
+
 ## Limitations
 
 * Supported source subset: module-level functions, `int`/`float`/`bool`
@@ -154,8 +234,9 @@ The harness verifies:
   assignments, `if/elif/else`, `while`, `return` and `print(...)`.
 * The x86_64 backend is integer-only (no floats, strings or calls) and follows
   the System V ABI with at most six register arguments.
-* Variables are treated as function-scoped (like Python); a variable that is
-  *first* assigned inside a conditional branch may need an explicit initial
-  value before the branch to map cleanly onto Rust/C scoping.
+* Values are 64-bit two's complement (see §4 above), not Python big integers.
+* A hoisted local must be assigned on every path before it is used, mirroring
+  Rust/C definite-initialization rules; a variable assigned in only one branch
+  of an `if` and read afterwards is rejected by the target compiler.
 * `print(...)` uses a generic format (`{:?}` in Rust, `%ld` in C) rather than
   inspecting argument types.

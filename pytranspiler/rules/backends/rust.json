@@ -3,6 +3,7 @@
   "target": "rust",
   "description": "Rust backend: literal (block structured) code generation.",
   "mode": "literal",
+  "hoist_locals": true,
   "indent_unit": "    ",
   "statement_suffix": ";",
   "extension": ".rs",
@@ -14,8 +15,9 @@
     "void": "()"
   },
   "templates": {
-    "FunctionDef": "{indent}pub fn {name}({params}) -> {return_type} {\n{body}\n{indent}}",
+    "FunctionDef": "{indent}pub fn {name}({params}) -> {return_type} {\n{locals}{body}\n{indent}}",
     "Param": "{mut}{name}: {type}",
+    "Local": "{indent}let {mut}{name}: {type};",
     "Return": "{indent}return {value};",
     "Assign": "{indent}{let_kw}{target} = {value};",
     "Reassign": "{indent}{target} = {value};",

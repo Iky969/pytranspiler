@@ -19,8 +19,10 @@ long sign(long x) {
 }
 
 long sum_to(long n) {
-    long total = 0;
-    long i = n;
+    long total;
+    long i;
+    total = 0;
+    i = n;
     while ((i > 0)) {
         total = (total + i);
         i = (i - 1);

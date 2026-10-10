@@ -21,6 +21,16 @@
       },
       "additionalProperties": false
     },
+    "local": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/type" },
+        "mutable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "expression": {
       "type": "object",
       "required": ["node"],
@@ -36,6 +46,7 @@
         "node": { "enum": ["FunctionDef", "Return", "Assign", "If", "While"] },
         "name": { "type": "string" },
         "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
+        "locals": { "type": "array", "items": { "$ref": "#/$defs/local" } },
         "return_type": { "$ref": "#/$defs/type" },
         "target": { "type": "string" },
         "body": { "type": "array", "items": { "$ref": "#/$defs/statement" } },
