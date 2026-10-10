@@ -128,12 +128,17 @@ class PythonFrontend:
                 )
             result = ir.bin_op(op, self.lower_expr(node.left), self.lower_expr(node.right))
         elif isinstance(node, ast.UnaryOp):
-            op = self.unary_ops.get(type(node.op).__name__)
-            if op is None:
-                raise FrontendError(
-                    f"unsupported unary operator {type(node.op).__name__} (line {node.lineno})"
+            if isinstance(node.op, ast.USub):
+                result = self.lower_expr(
+                    ast.BinOp(left=ast.Constant(value=0), op=ast.Sub(), right=node.operand)
                 )
-            result = ir.unary_op(op, self.lower_expr(node.operand))
+            else:
+                op = self.unary_ops.get(type(node.op).__name__)
+                if op is None:
+                    raise FrontendError(
+                        f"unsupported unary operator {type(node.op).__name__} (line {node.lineno})"
+                    )
+                result = ir.unary_op(op, self.lower_expr(node.operand))
         elif isinstance(node, ast.Compare):
             result = self._lower_compare(node)
         elif isinstance(node, ast.Call):

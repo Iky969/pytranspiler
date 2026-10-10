@@ -55,8 +55,12 @@ sign:
     movzx rax, al
     cmp rax, 0
     je .L_else_sign_if_2
+    mov rax, 0
+    push rax
     mov rax, 1
-    neg rax
+    mov r11, rax
+    pop rax
+    sub rax, r11
     jmp .L_end_sign
 .L_else_sign_if_2:
     mov rax, 0

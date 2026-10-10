@@ -7,11 +7,11 @@ pub fn mod_pos(a: i64, b: i64) -> i64 {
 }
 
 pub fn floor_div_neg(a: i64, b: i64) -> i64 {
-    return ({ let __a = (-a); let __b = b; let __r = __a % __b; if __r != 0 && (__a ^ __b) < 0 { __a / __b - 1 } else { __a / __b } });
+    return ({ let __a = (0 - a); let __b = b; let __r = __a % __b; if __r != 0 && (__a ^ __b) < 0 { __a / __b - 1 } else { __a / __b } });
 }
 
 pub fn mod_neg(a: i64, b: i64) -> i64 {
-    return ({ let __a = (-a); let __b = b; let __r = __a % __b; if __r != 0 && (__a ^ __b) < 0 { __r + __b } else { __r } });
+    return ({ let __a = (0 - a); let __b = b; let __r = __a % __b; if __r != 0 && (__a ^ __b) < 0 { __r + __b } else { __r } });
 }
 
 pub fn combined(a: i64, b: i64) -> i64 {

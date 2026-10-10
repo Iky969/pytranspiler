@@ -52,6 +52,7 @@ CASE_TARGETS: Dict[str, List[str]] = {
     "08_floordiv_mod": ["rust", "ruby", "c"],
     "09_strings": ["rust", "ruby"],
     "10_augassign": ["rust", "ruby", "x86_64", "c"],
+    "11_unary_minus": ["rust", "ruby", "x86_64", "c"],
 }
 
 # Deterministic sample arguments used when exercising generated functions.

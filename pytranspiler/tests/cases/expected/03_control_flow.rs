@@ -10,7 +10,7 @@ pub fn sign(x: i64) -> i64 {
     if (x > 0) {
         return 1;
     } else if (x < 0) {
-        return (-1);
+        return (0 - 1);
     } else {
         return 0;
     }

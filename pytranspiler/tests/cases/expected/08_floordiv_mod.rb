@@ -7,11 +7,11 @@ def mod_pos(a, b)
 end
 
 def floor_div_neg(a, b)
-  return ((-a) / b)
+  return ((0 - a) / b)
 end
 
 def mod_neg(a, b)
-  return ((-a) % b)
+  return ((0 - a) % b)
 end
 
 def combined(a, b)
