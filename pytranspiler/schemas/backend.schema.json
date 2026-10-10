@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pytranspiler/schemas/backend.schema.json",
+  "title": "Backend rule file",
+  "description": "Describes a code-generation target under rules/backends/.",
+  "type": "object",
+  "required": ["target", "mode", "templates"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "target": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "mode": { "enum": ["literal", "assembly"] },
+    "indent_unit": { "type": "string" },
+    "extension": { "type": "string", "minLength": 1 },
+    "header": { "type": "string" },
+    "footer": { "type": "string" },
+    "null": { "type": "string" },
+    "types": { "$ref": "#/$defs/stringMap" },
+    "templates": { "$ref": "#/$defs/stringMap" },
+    "operators": { "$ref": "#/$defs/stringMap" },
+    "unary_operators": { "$ref": "#/$defs/stringMap" },
+    "compare_operators": { "$ref": "#/$defs/stringMap" },
+    "boolean": { "$ref": "#/$defs/stringMap" },
+    "string": { "type": "object" },
+    "builtins": { "$ref": "#/$defs/stringMap" },
+    "abi": { "type": "string" },
+    "syntax": { "enum": ["nasm", "gas", "att", "intel"] },
+    "arg_registers": { "type": "array", "items": { "type": "string" } },
+    "accumulator": { "type": "string" },
+    "scratch_register": { "type": "string" },
+    "base_pointer": { "type": "string" },
+    "stack_pointer": { "type": "string" },
+    "word_size": { "type": "integer", "minimum": 1 },
+    "stack_alignment": { "type": "integer", "minimum": 1 },
+    "memory_sizes": { "$ref": "#/$defs/stringMap" },
+    "compare_setcc": { "$ref": "#/$defs/stringMap" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "stringMap": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

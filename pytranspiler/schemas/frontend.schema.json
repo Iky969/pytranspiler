@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pytranspiler/schemas/frontend.schema.json",
+  "title": "Frontend rule file",
+  "description": "Describes how a source language is lowered into the Canonical IR.",
+  "type": "object",
+  "required": ["language"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "language": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "binop_ops": { "$ref": "#/$defs/stringMap" },
+    "unary_ops": { "$ref": "#/$defs/stringMap" },
+    "compare_ops": { "$ref": "#/$defs/stringMap" },
+    "type_hints": { "$ref": "#/$defs/stringMap" },
+    "literal_types": { "$ref": "#/$defs/stringMap" },
+    "builtin_return_types": { "$ref": "#/$defs/stringMap" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "stringMap": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "../../schemas/backend.schema.json",
+  "target": "ruby",
+  "description": "Ruby backend: literal (block structured) code generation.",
+  "mode": "literal",
+  "indent_unit": "  ",
+  "extension": ".rb",
+  "types": {},
+  "templates": {
+    "FunctionDef": "{indent}def {name}({params})\n{body}\n{indent}end",
+    "Param": "{name}",
+    "Return": "{indent}return {value}",
+    "Assign": "{indent}{target} = {value}",
+    "If": "{indent}if {test}\n{body}{orelse}\n{indent}end",
+    "Elif": "\n{indent}elsif {test}\n{body}{orelse}",
+    "Else": "\n{indent}else\n{body}",
+    "While": "{indent}while {test}\n{body}\n{indent}end",
+    "Call": "{func}({args})",
+    "BinOp": "({left} {op} {right})",
+    "UnaryOp": "({op}{operand})",
+    "Compare": "({left} {op} {right})",
+    "Var": "{name}",
+    "Literal": "{value}"
+  },
+  "operators": {
+    "ADD": "+",
+    "SUB": "-",
+    "MUL": "*",
+    "DIV": "/",
+    "FLOORDIV": "/",
+    "MOD": "%",
+    "POW": "**",
+    "AND": "&&",
+    "OR": "||"
+  },
+  "unary_operators": {
+    "UADD": "+",
+    "USUB": "-",
+    "NOT": "!"
+  },
+  "compare_operators": {
+    "EQ": "==",
+    "NEQ": "!=",
+    "LT": "<",
+    "LTE": "<=",
+    "GT": ">",
+    "GTE": ">="
+  },
+  "boolean": {
+    "true": "true",
+    "false": "false"
+  },
+  "string": {
+    "quote": "\""
+  },
+  "builtins": {
+    "print": "puts({args})"
+  }
+}

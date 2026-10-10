@@ -1,0 +1,67 @@
+{
+  "$schema": "../../schemas/backend.schema.json",
+  "target": "c",
+  "description": "C backend: literal code generation. Demonstrates Phase 5 extensibility.",
+  "mode": "literal",
+  "indent_unit": "    ",
+  "statement_suffix": ";",
+  "extension": ".c",
+  "header": "#include <stdbool.h>\n\n",
+  "types": {
+    "i64": "long",
+    "f64": "double",
+    "bool": "bool",
+    "str": "char *",
+    "void": "void"
+  },
+  "templates": {
+    "FunctionDef": "{indent}{return_type} {name}({params}) {\n{body}\n{indent}}",
+    "Param": "{type} {name}",
+    "Return": "{indent}return {value};",
+    "Assign": "{indent}{type} {target} = {value};",
+    "Reassign": "{indent}{target} = {value};",
+    "If": "{indent}if ({test}) {\n{body}\n{indent}}{orelse}",
+    "Elif": " else if ({test}) {\n{body}\n{indent}}{orelse}",
+    "Else": " else {\n{body}\n{indent}}",
+    "While": "{indent}while ({test}) {\n{body}\n{indent}}",
+    "Call": "{func}({args})",
+    "BinOp": "({left} {op} {right})",
+    "UnaryOp": "({op}{operand})",
+    "Compare": "({left} {op} {right})",
+    "Var": "{name}",
+    "Literal": "{value}"
+  },
+  "operators": {
+    "ADD": "+",
+    "SUB": "-",
+    "MUL": "*",
+    "DIV": "/",
+    "FLOORDIV": "/",
+    "MOD": "%",
+    "AND": "&&",
+    "OR": "||"
+  },
+  "unary_operators": {
+    "UADD": "+",
+    "USUB": "-",
+    "NOT": "!"
+  },
+  "compare_operators": {
+    "EQ": "==",
+    "NEQ": "!=",
+    "LT": "<",
+    "LTE": "<=",
+    "GT": ">",
+    "GTE": ">="
+  },
+  "boolean": {
+    "true": "true",
+    "false": "false"
+  },
+  "string": {
+    "quote": "\""
+  },
+  "builtins": {
+    "print": "printf(\"%ld\\n\", (long){args})"
+  }
+}

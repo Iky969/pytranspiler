@@ -1,0 +1,46 @@
+{
+  "$schema": "../../schemas/frontend.schema.json",
+  "language": "python",
+  "description": "Mapping rules that lower the Python AST into the Canonical IR.",
+  "binop_ops": {
+    "Add": "ADD",
+    "Sub": "SUB",
+    "Mult": "MUL",
+    "Div": "DIV",
+    "FloorDiv": "FLOORDIV",
+    "Mod": "MOD",
+    "Pow": "POW"
+  },
+  "unary_ops": {
+    "UAdd": "UADD",
+    "USub": "USUB",
+    "Not": "NOT"
+  },
+  "compare_ops": {
+    "Eq": "EQ",
+    "NotEq": "NEQ",
+    "Lt": "LT",
+    "LtE": "LTE",
+    "Gt": "GT",
+    "GtE": "GTE"
+  },
+  "type_hints": {
+    "int": "i64",
+    "float": "f64",
+    "bool": "bool",
+    "str": "str",
+    "None": "void"
+  },
+  "literal_types": {
+    "bool": "bool",
+    "int": "i64",
+    "float": "f64",
+    "str": "str",
+    "none": "void"
+  },
+  "builtin_return_types": {
+    "print": "void",
+    "range": "void",
+    "len": "i64"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "../../schemas/backend.schema.json",
+  "target": "x86_64",
+  "description": "x86_64 assembly backend (System V ABI, NASM syntax).",
+  "mode": "assembly",
+  "abi": "SystemV",
+  "syntax": "nasm",
+  "extension": ".asm",
+  "arg_registers": ["rdi", "rsi", "rdx", "rcx", "r8", "r9"],
+  "accumulator": "rax",
+  "scratch_register": "r11",
+  "base_pointer": "rbp",
+  "stack_pointer": "rsp",
+  "word_size": 8,
+  "stack_alignment": 16,
+  "memory_sizes": {
+    "i64": "qword",
+    "f64": "qword",
+    "bool": "byte",
+    "str": "qword",
+    "void": "qword"
+  },
+  "templates": {
+    "FunctionDef": "global {name}\n{name}:\n    push rbp\n    mov rbp, rsp\n{frame}{body}\n{end_label}:\n    mov rsp, rbp\n    pop rbp\n    ret"
+  },
+  "operators": {
+    "ADD": "add",
+    "SUB": "sub",
+    "MUL": "imul",
+    "DIV": "idiv",
+    "FLOORDIV": "idiv",
+    "MOD": "idiv"
+  },
+  "compare_setcc": {
+    "EQ": "sete",
+    "NEQ": "setne",
+    "LT": "setl",
+    "LTE": "setle",
+    "GT": "setg",
+    "GTE": "setge"
+  },
+  "unary_operators": {
+    "UADD": "nop",
+    "USUB": "neg"
+  }
+}

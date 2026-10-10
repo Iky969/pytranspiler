@@ -1,0 +1,67 @@
+{
+  "$schema": "../../schemas/backend.schema.json",
+  "target": "rust",
+  "description": "Rust backend: literal (block structured) code generation.",
+  "mode": "literal",
+  "indent_unit": "    ",
+  "statement_suffix": ";",
+  "extension": ".rs",
+  "types": {
+    "i64": "i64",
+    "f64": "f64",
+    "bool": "bool",
+    "str": "String",
+    "void": "()"
+  },
+  "templates": {
+    "FunctionDef": "{indent}pub fn {name}({params}) -> {return_type} {\n{body}\n{indent}}",
+    "Param": "{mut}{name}: {type}",
+    "Return": "{indent}return {value};",
+    "Assign": "{indent}{let_kw}{target} = {value};",
+    "Reassign": "{indent}{target} = {value};",
+    "If": "{indent}if {test} {\n{body}\n{indent}}{orelse}",
+    "Elif": " else if {test} {\n{body}\n{indent}}{orelse}",
+    "Else": " else {\n{body}\n{indent}}",
+    "While": "{indent}while {test} {\n{body}\n{indent}}",
+    "Call": "{func}({args})",
+    "BinOp": "({left} {op} {right})",
+    "UnaryOp": "({op}{operand})",
+    "Compare": "({left} {op} {right})",
+    "Var": "{name}",
+    "Literal": "{value}"
+  },
+  "operators": {
+    "ADD": "+",
+    "SUB": "-",
+    "MUL": "*",
+    "DIV": "/",
+    "FLOORDIV": "/",
+    "MOD": "%",
+    "POW": "pow",
+    "AND": "&&",
+    "OR": "||"
+  },
+  "unary_operators": {
+    "UADD": "+",
+    "USUB": "-",
+    "NOT": "!"
+  },
+  "compare_operators": {
+    "EQ": "==",
+    "NEQ": "!=",
+    "LT": "<",
+    "LTE": "<=",
+    "GT": ">",
+    "GTE": ">="
+  },
+  "boolean": {
+    "true": "true",
+    "false": "false"
+  },
+  "string": {
+    "quote": "\""
+  },
+  "builtins": {
+    "print": "println!(\"{:?}\", {args})"
+  }
+}

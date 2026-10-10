@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pytranspiler/schemas/ir.schema.json",
+  "title": "Canonical IR module",
+  "description": "The neutral intermediate representation every frontend lowers to and every backend consumes.",
+  "type": "object",
+  "required": ["unit", "body"],
+  "properties": {
+    "unit": { "const": "module" },
+    "body": { "type": "array", "items": { "$ref": "#/$defs/statement" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "type": { "enum": ["i64", "f64", "bool", "str", "void", null] },
+    "param": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/type" }
+      },
+      "additionalProperties": false
+    },
+    "expression": {
+      "type": "object",
+      "required": ["node"],
+      "properties": {
+        "node": { "enum": ["BinOp", "UnaryOp", "Compare", "Call", "Var", "Literal"] },
+        "type": { "$ref": "#/$defs/type" }
+      }
+    },
+    "statement": {
+      "type": "object",
+      "required": ["node"],
+      "properties": {
+        "node": { "enum": ["FunctionDef", "Return", "Assign", "If", "While"] },
+        "name": { "type": "string" },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
+        "return_type": { "$ref": "#/$defs/type" },
+        "target": { "type": "string" },
+        "body": { "type": "array", "items": { "$ref": "#/$defs/statement" } },
+        "orelse": { "type": "array", "items": { "$ref": "#/$defs/statement" } },
+        "type": { "$ref": "#/$defs/type" }
+      }
+    }
+  }
+}
